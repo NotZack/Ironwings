@@ -1,0 +1,1048 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+	<meta charset="UTF-8" />
+	<title>Phaser - Making your first game, part 1</title>
+    <script src="//cdn.jsdelivr.net/phaser/2.2.2/phaser.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<script type="text/javascript">
+
+//constants
+var STARTING_HEALTH = 20;
+var BULLET_DAMAGE = 1;
+var MISSILE_DAMAGE = 2;
+var RAMMING_DAMAGE = 4;
+var RAMMING_TIME = 10;
+var SHIELD_TIME = 5;
+var RAPID_FIRE_MULT = 2;
+var RAPID_FIRE_TIME = 10;
+var DAMAGE_BOOST_MULT = 2;
+var DAMAGE_BOOST_TIME = 10;
+var BULLET_SPEED = 300;
+var COLLISION_DAMAGE = 2;
+
+/*global Phaser*/
+var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+
+//Player variables
+var player1Char = 'plane1';
+var player2Char = 'plane1';
+var stageSelect = 'map1';
+var gameState = 1;
+var stageObstacle = 'obstacle';
+var p1Controls;
+var p2Controls;
+var player1;
+var player2;
+
+
+var p1Aim = [150, 0];
+var p2Aim = [-150, 0];
+var bullets;
+
+var boundaries;
+var p1healthBar;
+var p2healthBar;
+
+var background;
+
+var player1Select;
+var player2Select;
+
+var select = null;
+var select2 = null;
+var menuGroup;
+
+var items = ['missile','health','shield','rapid'];
+var power1;
+var power2;
+var itemBoxes;
+var missiles;
+var timer;
+
+var p1Score = 0;
+var p2Score = 0;
+
+var music = game.add.audio('titleMenu');
+var effects = game.add.audio('explosion');
+var effects2 = game.add.audio('selectSound');
+
+function preload() {
+    game.load.spritesheet('plane1', 'assets/plane1.png', 100, 100);
+    game.load.spritesheet('plane2', 'assets/plane2.png', 100, 100);
+    game.load.spritesheet('plane3', 'assets/plane3.png', 100, 100);
+    game.load.spritesheet('plane4', 'assets/plane4.png', 100, 100);
+    
+    game.load.image('arrow', 'assets/arrow.png');
+    game.load.image('arrow2', 'assets/arrow2.png');
+    game.load.image('square', 'assets/square.png'); 
+    game.load.image('mapTitle', 'assets/mapTitle.png'); 
+    
+    game.load.image('map1', 'assets/map1.png'); 
+    game.load.image('map2', 'assets/map2.png');
+    game.load.image('map3', 'assets/map3.png');
+    game.load.image('map4', 'assets/map4.png');
+    game.load.image('stage1', 'assets/stage1.png'); 
+    game.load.image('stage2', 'assets/stage2.png');
+    game.load.image('stage3', 'assets/stage3.png');
+    game.load.image('stage4', 'assets/stage4.png');
+    
+    game.load.audio('explosion', 'assets/explosion.mp3');
+    game.load.audio('oof', 'assets/oof.mp3');
+    game.load.audio('button', 'assets/button.mp3');
+    game.load.audio('gameplayMusic', 'assets/gameplayMusic.mp3');
+    game.load.audio('stageSelect', 'assets/stageSelect.mp3');
+    game.load.audio('titleMenu', 'assets/titleMenu.mp3');
+    game.load.audio('selectSound', 'assets/selectSound.mp3');
+    game.load.audio('charMenu', 'assets/charMenu.mp3');
+    game.load.audio('shootSound', 'assets/shootSound.mp3');
+    game.load.audio('missileSound', 'assets/missileSound.mp3');
+    game.load.audio('shieldSound', 'assets/shieldSound.mp3');
+    game.load.audio('england', 'assets/england.mp3');
+    game.load.audio('static', 'assets/static.mp3');
+    
+    game.load.image('obstacle','assets/obstacle.png');
+    game.load.image('itemBox','assets/itemBox.png');
+    game.load.image('healthBar','assets/healthBar.png');
+    game.load.image('boundary','assets/platform.png');
+    game.load.image('bullet','assets/bullet.png');
+    game.load.image('itemSpace','assets/itemSpace.png');
+    game.load.image('rapid','assets/rapidFire.png');
+    game.load.image('shield','assets/shield.png');
+    game.load.image('health','assets/firstaid.png');
+    game.load.image('missile','assets/missile.png');
+    game.load.image('title','assets/title boiz.png');
+    game.load.image('scare','assets/scare.jpg');
+}
+
+function create() {
+
+    //P2 controls
+    p2Controls = game.input.keyboard.createCursorKeys();
+    p2Controls.shoot = game.input.keyboard.addKey(Phaser.Keyboard.P);
+    p2Controls.item = game.input.keyboard.addKey(Phaser.Keyboard.O);
+    
+    //P1 controls
+    p1Controls = {
+      up: game.input.keyboard.addKey(Phaser.Keyboard.W),
+      down: game.input.keyboard.addKey(Phaser.Keyboard.S),
+      left: game.input.keyboard.addKey(Phaser.Keyboard.A),
+      right: game.input.keyboard.addKey(Phaser.Keyboard.D),
+      shoot: game.input.keyboard.addKey(Phaser.Keyboard.SHIFT),
+      item: game.input.keyboard.addKey(Phaser.Keyboard.E),
+      exit: game.input.keyboard.addKey(Phaser.Keyboard.TILDE)
+    };
+    
+    select = mainMenuInit();
+
+    game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
+	
+    game.input.onDown.add(gofull, this);
+}
+
+function update() {
+    
+    if (gameState == 1) {
+        mainMenu();
+    }
+    else if (gameState == 2) {
+        setTimeout(charSelect, 300);
+    }
+    else if (gameState == 3) {
+        setTimeout(chooseStage, 300);
+    }
+    else if (gameState == 4) {
+        gameplay();
+    }
+    
+}
+
+function mainMenuInit() {
+    //background
+    game.add.sprite(0, 0, 'mapTitle');
+    
+    //cursor
+    var selection = game.add.sprite(300, 400, 'arrow');
+        
+    //text
+	menuGroup = game.add.group();
+	game.add.sprite(10, 100, 'title');
+	menuGroup.add(game.make.text(350, 400, 'START!',  { font: "32px Arial", fill: generateHexColor() }));
+    menuGroup.add(game.make.text(350, 500, 'EXIT!',  { font: "32px Arial", fill: generateHexColor() }));
+    
+    music = game.add.audio('titleMenu');
+    effects = game.add.audio('button');
+    effects2 = game.add.audio('selectSound');
+    
+    music.play();
+    return selection;
+}
+
+function mainMenu() {
+    if (select.y == 400 && p1Controls.down.isDown) {
+        select.y += 100;
+
+        effects.play();
+    }
+    else if (select.y == 500 && p1Controls.up.isDown) {
+        select.y -= 100;
+
+        effects.play();
+    }
+    else if (select.y == 400 && p1Controls.shoot.isDown) {
+        //startCharSelect
+        
+        effects2.play();
+        
+        charSelectInit();
+        player2Arrow();
+        gameState = 2;
+        
+
+    }
+    else if (select.y == 500 && p1Controls.shoot.isDown) {
+        //noExit
+        menuGroup.add(game.make.text(20, 20, 'You cannot leave',  { font: "32px Arial", fill: generateHexColor() }));
+        effects2.play();
+    }
+}
+
+function charSelectInit() {
+    p1Controls.item.onDown.remove(toScare);
+    game.add.sprite(0, 0, 'mapTitle');
+
+    game.add.sprite(180, 175, 'square');
+    game.add.sprite(180, 375, 'square');
+    game.add.sprite(480, 175, 'square');
+    game.add.sprite(480, 375, 'square');
+    game.add.sprite(235, 225, 'plane1');
+    game.add.sprite(235, 425, 'plane2');
+    game.add.sprite(535, 225, 'plane3');
+    game.add.sprite(535, 425, 'plane4');
+    
+    var selection = game.add.sprite(130, 240, 'arrow');
+    
+    var textGroup = game.add.group();
+    textGroup.add(game.make.text(190, 100, 'CHOOSE  YOUR  FIGHTER!',  { font: "32px Arial", fill: generateHexColor() }));
+    
+    music.stop();
+    
+    music = game.add.audio('charMenu');
+    effects = game.add.audio('button');
+    effects2 = game.add.audio('selectSound');
+    
+    music.play();
+    
+    select = selection;
+    return select;
+}
+
+function player2Arrow() {
+    var selection = game.add.sprite(130, 240, 'arrow2');
+    select2 = selection;
+    return select2;
+}
+
+function charSelect() {
+    
+    //SELECTED textgroup
+    var selectGroup = game.add.group();
+    
+    //highlighting the planes, player 1
+    //top left
+    if (select.x == 130 && select.y == 240 && p1Controls.down.isDown) {
+        select.y += 200;
+        effects.play();
+    }
+    else if (select.x == 130 && select.y == 240 && p1Controls.right.isDown) {
+        select.x += 300;
+        effects.play();
+    }
+    //bottom left
+    else if (select.x == 130 && select.y == 440 && p1Controls.up.isDown) {
+        select.y -= 200;
+        effects.play();
+    }
+    else if (select.x == 130 && select.y == 440 && p1Controls.right.isDown) {
+        select.x += 300;
+        effects.play();
+    }
+    //top right
+    else if (select.x == 430 && select.y == 240 && p1Controls.down.isDown) {
+        select.y += 200;
+        effects.play();
+    }
+    else if (select.x == 430 && select.y == 240 && p1Controls.left.isDown) {
+        select.x -= 300;
+        effects.play();
+    }
+    //bottom right
+    else if (select.x == 430 && select.y == 440 && p1Controls.up.isDown) {
+        select.y -= 200;
+        effects.play();
+    }
+    else if (select.x == 430 && select.y == 440 && p1Controls.left.isDown) {
+        select.x -= 300;
+        effects.play();
+    }
+
+    //Checking for actual selection, player 1
+    //top left
+    else if (select.x == 130 && select.y == 240 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        player1Char = 'plane1';
+        player1Select = true;
+        selectGroup.add(game.make.text(180, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //bottom left
+    else if (select.x == 130 && select.y == 440 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        player1Char = 'plane2';
+        player1Select = true;
+        selectGroup.add(game.make.text(180, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //top right
+    else if (select.x == 430 && select.y == 240 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        player1Char = 'plane3';
+        player1Select = true;
+        selectGroup.add(game.make.text(480, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //bottom right
+    else if (select.x == 430 && select.y == 440 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        player1Char = 'plane4';
+        player1Select = true;
+        selectGroup.add(game.make.text(480, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    
+    //highlighting the planes, player 2
+    //top left
+    if (select2.x == 130 && select2.y == 240 && p2Controls.down.isDown) {
+        select2.y += 200;
+        effects.play();
+    }
+    else if (select2.x == 130 && select2.y == 240 && p2Controls.right.isDown) {
+        select2.x += 300;
+        effects.play();
+    }
+    //bottom left
+    else if (select2.x == 130 && select2.y == 440 && p2Controls.up.isDown) {
+        select2.y -= 200;
+        effects.play();
+    }
+    else if (select2.x == 130 && select2.y == 440 && p2Controls.right.isDown) {
+        select2.x += 300;
+        effects.play();
+    }
+    //top right
+    else if (select2.x == 430 && select2.y == 240 && p2Controls.down.isDown) {
+        select2.y += 200;
+        effects.play();
+    }
+    else if (select2.x == 430 && select2.y == 240 && p2Controls.left.isDown) {
+        select2.x -= 300;
+        effects.play();
+    }
+    //bottom right
+    else if (select2.x == 430 && select2.y == 440 && p2Controls.up.isDown) {
+        select2.y -= 200;
+        effects.play();
+    }
+    else if (select2.x == 430 && select2.y == 440 && p2Controls.left.isDown) {
+        select2.x -= 300;
+        effects.play();
+    }
+
+    //Checking for actual selection, player 2
+    //top left
+    if (select2.x == 130 && select2.y == 240 && p2Controls.shoot.isDown) {
+        select2.x = 1000;
+        player2Char = 'plane1';
+        player2Select = true;
+        selectGroup.add(game.make.text(180, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //bottom left
+    else if (select2.x == 130 && select2.y == 440 && p2Controls.shoot.isDown) {
+        select2.x = 1000;
+        player2Char = 'plane2';
+        player2Select = true;
+        selectGroup.add(game.make.text(180, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //top right
+    else if (select2.x == 430 && select2.y == 240 && p2Controls.shoot.isDown) {
+        select2.x = 1000;
+        player2Char = 'plane3';
+        player2Select = true;
+        selectGroup.add(game.make.text(480, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    //bottom right
+    else if (select2.x == 430 && select2.y == 440 && p2Controls.shoot.isDown) {
+        select2.x = 1000;
+        player2Char = 'plane4';
+        player2Select = true;
+        selectGroup.add(game.make.text(480, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        effects2.play();
+    }
+    
+    //start when ready
+    if (player1Select && player2Select) {
+        chooseStageInit();
+        gameState = 3;
+    }
+}
+
+function chooseStageInit() {
+    game.add.sprite(0, 0, 'mapTitle');
+
+    game.add.sprite(190, 175, 'map1');
+    game.add.sprite(190, 375, 'map2');
+    game.add.sprite(490, 175, 'map3');
+    game.add.sprite(490, 375, 'map4');
+    
+    var selection = game.add.sprite(130, 240, 'arrow');
+    
+    var textGroup = game.add.group();
+    textGroup.add(game.make.text(200, 100, 'CHOOSE    YOUR    STAGE',  { font: "32px Arial", fill: generateHexColor() }));
+    
+    music.stop();
+    
+    music = game.add.audio('stageSelect');
+    effects = game.add.audio('button');
+    effects2 = game.add.audio('selectSound');
+    
+    music.play();
+    
+    select = selection;
+    return select;    
+}
+
+function chooseStage() {
+
+    //SELECTED textgroup
+    var stageGroup = game.add.group();
+    
+    //highlighting the planes, player 1
+    //top left
+    if (select.x == 130 && select.y == 240 && p1Controls.down.isDown) {
+        select.y += 200;
+        
+        background = game.add.sprite(0, 0, 'map2');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    else if (select.x == 130 && select.y == 240 && p1Controls.right.isDown) {
+        select.x += 300;
+
+        background = game.add.sprite(0, 0, 'map3');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    //bottom left
+    else if (select.x == 130 && select.y == 440 && p1Controls.up.isDown) {
+        select.y -= 200;
+        
+        background = game.add.sprite(0, 0, 'map1');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    else if (select.x == 130 && select.y == 440 && p1Controls.right.isDown) {
+        select.x += 300;
+        
+        background = game.add.sprite(0, 0, 'map4');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    //top right
+    else if (select.x == 430 && select.y == 240 && p1Controls.down.isDown) {
+        select.y += 200;
+        
+        background = game.add.sprite(0, 0, 'map4');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    else if (select.x == 430 && select.y == 240 && p1Controls.left.isDown) {
+        select.x -= 300;
+        
+        background = game.add.sprite(0, 0, 'map1');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    //bottom right
+    else if (select.x == 430 && select.y == 440 && p1Controls.up.isDown) {
+        select.y -= 200;
+        
+        background = game.add.sprite(0, 0, 'map3');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+    else if (select.x == 430 && select.y == 440 && p1Controls.left.isDown) {
+        select.x -= 300;
+        
+        background = game.add.sprite(0, 0, 'map2');
+        background.height = game.height;
+        background.width = game.width;
+        
+        game.add.sprite(190, 175, 'map1');
+        game.add.sprite(190, 375, 'map2');
+        game.add.sprite(490, 175, 'map3');
+        game.add.sprite(490, 375, 'map4');
+        
+        effects.play();
+        
+        game.add.sprite(select.x, select.y, 'arrow');
+    }
+
+    //Checking for actual selection, player 1
+    //top left
+    else if (select.x == 130 && select.y == 240 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        stageSelect = "stage1";
+        effects2.play();
+        stageGroup.add(game.make.text(180, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        gameplayInit();
+        gameState = 4;
+        
+    }
+    //bottom left
+    else if (select.x == 130 && select.y == 440 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        stageSelect = "stage2";
+        effects2.play();
+        stageGroup.add(game.make.text(180, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        gameplayInit();
+        gameState = 4;
+    }
+    //top right
+    else if (select.x == 430 && select.y == 240 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        stageSelect = "stage3";
+        effects2.play();
+        stageGroup.add(game.make.text(480, 240, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        gameplayInit();
+        gameState = 4;
+    }
+    //bottom right
+    else if (select.x == 430 && select.y == 440 && p1Controls.shoot.isDown) {
+        select.x = 1000;
+        stageSelect = "stage4";
+        effects2.play();
+        stageGroup.add(game.make.text(480, 440, 'SELECTED',  { font: "32px Arial", fill: '#EEE300' }));
+        gameplayInit();
+        gameState = 4;
+    }
+}
+
+function gameplayInit() {
+    
+    //background
+    background = game.add.sprite(0, 0, stageSelect);
+    background.height = game.height;
+    background.width = game.width;
+    
+    music.stop();
+    
+    music = game.add.audio('gameplayMusic');
+    effects = game.add.audio('shootSound');
+    effects2 = game.add.audio('itemSound');
+    
+    if (stageSelect == ('stage1')) {
+        var stupid = game.add.audio('england');
+        stupid.play();
+    }
+
+    
+    music.play();
+    
+    //making barriers
+    boundaries = game.add.group();
+    boundaries.enableBody = true;
+    
+    var boundary = boundaries.create(0,-32,'boundary');
+    boundary.scale.setTo(2,1);
+    boundary.body.immovable = true;
+    boundary = boundaries.create(-40,0,'boundary');
+    boundary.scale.setTo(.1,30);
+    boundary.body.immovable = true;
+    boundary = boundaries.create(game.world.width, 0 ,'boundary');
+    boundary.scale.setTo(.1,30);
+    boundary.body.immovable = true;
+    boundary = boundaries.create(0,game.world.height,'boundary');
+    boundary.scale.setTo(2,1);
+    boundary.body.immovable = true;
+    
+    //making the obstacle
+    boundary = boundaries.create(Math.floor(Math.random()*game.world.width * 0.25)+(game.world.width * 0.25), Math.floor(Math.random()*(game.world.height - 200)), stageObstacle);
+    boundary.body.immovable = true;
+    
+    //making the players
+    player1 = game.add.sprite(50, game.world.height / 2, player1Char);
+    player1.frame = 2;
+    player1.item = null;
+    player1.hasItem = false;
+    
+    player2 = game.add.sprite(game.world.width-150, game.world.height / 2, player2Char);
+    player2.frame = 0;
+    player2.item = null;
+    player2.hasItem = false;
+    
+    player1.dead = false;
+    player2.dead = false;
+
+    game.physics.arcade.enable(player1);
+    game.physics.arcade.enable(player2);
+    
+    player1.body.collideWorldBounds = false;
+    player1.body.bounce = 0.2;
+    player1.body.gravity.y = 0;
+    player2.body.collideWorldBounds = false;
+    player2.body.bounce = 0.2;
+    player2.body.gravity.y = 0;
+    
+    player1.health = STARTING_HEALTH;
+    player2.health = STARTING_HEALTH;
+    
+    player1.fireRate = 500;
+    player2.fireRate = 500;
+    
+    
+    //making health bars
+    p1healthBar = game.add.sprite(0,38.5,'healthBar');
+    p2healthBar = game.add.sprite(game.world.width - 400, game.world.height - 62.5, 'healthBar');
+    
+    //making item spaces
+    game.add.sprite(0,0,'itemSpace');
+    game.add.sprite(game.world.width - 100, game.world.height - 100,'itemSpace');
+    
+    
+    itemBoxes = game.add.group();
+    itemBoxes.enableBody = true;
+    
+    missiles = game.add.group();
+    missiles.enableBody = true;
+    
+    bullets = game.add.group();
+    bullets.enableBody = true;
+    
+    timer = new Phaser.Timer(game);
+    timer.start();
+    spawnItemBox();
+    game.time.events.loop(15000, spawnItemBox, this);
+    player1.canShoot = true;
+    player2.canShoot = true;
+    
+    
+    if (player1.dead) {
+        player1.scale.setTo(1,1);
+        player1.x = 50;
+        player1.y = game.world.height / 2;
+        player1.dead = false;
+    }
+    if (player2.dead) {
+        player2.scale.setTo(1,1);
+        player2.x = game.world.width-150;
+        player2.y = game.world.height / 2;
+        player2.dead = false;
+    }
+
+    p1Controls.item.onDown.add(toScare);
+}
+
+function gameplay() {
+    
+    //P1 controls
+    if(!player1.dead){
+        if(p1Controls.up.isDown){
+            p1Aim = [0,-BULLET_SPEED];
+            player1.frame = 1;
+            player1.body.velocity.y-=5;
+        }
+        if(p1Controls.down.isDown){
+            p1Aim = [0,BULLET_SPEED];
+            player1.frame = 3;
+            player1.body.velocity.y+=5;
+        }
+        if(p1Controls.left.isDown){
+            p1Aim = [-BULLET_SPEED,0];
+            player1.frame = 0;
+            player1.body.velocity.x-=5;
+        }
+        if(p1Controls.right.isDown){
+            p1Aim = [BULLET_SPEED,0];
+            player1.frame = 2;
+            player1.body.velocity.x+=5;
+        }
+        if(p1Controls.item.isDown){
+            if(player1.hasItem){
+                player1.hasItem = false;
+                activateItem(player1, player2, p1Aim, power1);
+                player1.item = null;
+            }
+        }
+        if(p1Controls.shoot.isDown){
+            if(player1.canShoot){
+                p1shoot();
+            }
+        }
+        if(p1Controls.exit.isDown){
+            leaveGameplay();
+        }
+        
+    }
+    
+    //P2 controls
+    if(!player2.dead){
+        if(p2Controls.up.isDown){ 
+            p2Aim = [0,-BULLET_SPEED];
+            player2.frame = 1;
+            player2.body.velocity.y-=5;
+        }
+        if(p2Controls.down.isDown){
+            p2Aim = [0,BULLET_SPEED];
+            player2.frame = 3;
+            player2.body.velocity.y+=5;
+        }
+        if(p2Controls.left.isDown){
+            p2Aim = [-BULLET_SPEED,0];
+            player2.frame = 0;
+            player2.body.velocity.x-=5;
+        }
+        if(p2Controls.right.isDown){
+            p2Aim = [BULLET_SPEED,0];
+            player2.frame = 2;
+            player2.body.velocity.x+=5;
+        }
+        if(p2Controls.item.isDown){
+            if(player2.hasItem){
+                player2.hasItem = false;
+                activateItem(player2, player1, p2Aim, power2);
+                player2.item = null;
+            }
+        }
+        if(p2Controls.shoot.isDown){
+            if(player2.canShoot){
+                p2shoot();
+            }
+        }
+    }
+    
+    player1.body.velocity.x *= .99;
+    player1.body.velocity.y *= .99;
+    player2.body.velocity.x *= .99;
+    player2.body.velocity.y *= .99;
+    
+    //collisions
+    game.physics.arcade.overlap(boundaries, player1, function(){p1damage(2);}, function(){player1.x -= player1.body.velocity.x/20; player1.y -= player1.body.velocity.y/20; player1.body.velocity.x *= -.2; player1.body.velocity.y *= -.2; return true;}, this);
+    game.physics.arcade.overlap(boundaries, player2, function(){p2damage(2);}, function(){player2.x -= player2.body.velocity.x/20; player2.y -= player2.body.velocity.y/20; player2.body.velocity.x *= -.2; player2.body.velocity.y *= -.2; return true;}, this);
+    game.physics.arcade.overlap(bullets, player1, function(){p1damage(1);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(bullets, player2, function(){p2damage(1);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(itemBoxes, player1, function(){giveItem(player1);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(itemBoxes, player2, function(){giveItem(player2);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(missiles, player1, function(){p1damage(2);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(missiles, player2, function(){p2damage(2);}, deleteGroupMember, this);
+    game.physics.arcade.overlap(boundaries, missiles, deleteGroupMember, null, this);
+    game.physics.arcade.overlap(boundaries, bullets, deleteGroupMember, null, this);
+    
+    //updating health bars
+    p1healthBar.x = -300 + (15 * player1.health);
+    p2healthBar.x = 700 - (15 * player2.health);
+    
+    
+    
+    //death
+    if(player1.health <=0){
+        player1.health = 100000;
+        killPlayer1();
+    }
+    if(player2.health <=0){
+        player2.health = 100000;
+        killPlayer2();
+    }
+    
+    if (player1.dead == true) {
+        player1.dead = false;
+        setTimeout(leaveGameplay, 3000);
+    }
+    else if (player2.dead == true) {
+        player2.dead = false;
+        setTimeout(leaveGameplay, 3000);
+    }
+    
+}
+
+function scare() {
+    var barney = game.add.sprite(0, 0, 'scare');
+    var static = game.add.audio('static');
+    static.play();
+    game.time.events.add(timer.ms + 200, function(){barney.x = 1000;}, this);
+}
+
+function leaveGameplay() {
+    player1.dead = false;
+    player2.dead = false;
+    player1.health = STARTING_HEALTH;
+    player2.health = STARTING_HEALTH;
+    charSelectInit();
+    gameState = 2;
+    player1Char = "";
+    player2Char = "";
+    player2Select = false;
+    player1Select = false;
+    player2Arrow();
+}
+function generateHexColor() { 
+    return '#' + ((0.5 + 0.5 * Math.random()) * 0xFFFFFF << 0).toString(16);
+}
+
+function gofull() {
+
+    if (game.scale.isFullScreen)
+    {
+        game.scale.stopFullScreen();
+    }
+    else
+    {
+        game.scale.startFullScreen(false);
+    }
+
+}
+
+function p1shoot(){
+    //if(p1Controls.shoot.isDown){
+    player1.canShoot = false; 
+    var bullet = bullets.create(player1.x+40+(p1Aim[0]/4),player1.y+40+(p1Aim[1]/4),'bullet');
+    game.physics.arcade.enable(bullet);
+    bullet.body.velocity.x = p1Aim[0];
+    bullet.body.velocity.y = p1Aim[1];
+    game.time.events.add(timer.ms + player1.fireRate, function(){player1.canShoot = true;},this);
+    //}
+}
+
+function p2shoot(){
+    player2.canShoot = false;
+        var bullet = bullets.create(player2.x+40+(p2Aim[0]/4),player2.y+40+(p2Aim[1]/4),'bullet');
+        game.physics.arcade.enable(bullet);
+        bullet.body.velocity.x = p2Aim[0];
+        bullet.body.velocity.y = p2Aim[1];
+    game.time.events.add(timer.ms + player2.fireRate, function(){player2.canShoot = true;},this);
+}
+
+function p1damage(damage){
+    player1.health -= damage;
+    
+}
+function p2damage(damage) {
+    player2.health -= damage;
+}
+
+function deleteGroupMember(player, object) {
+    object.kill();
+    return true;
+}
+
+function killPlayer1() {
+    if (player1.health >= 1000 && !player1.dead) {
+        player1.dead = true;
+        p1Score += 1;
+        var shrinkValue = 1;
+        game.time.events.repeat(100, 11, function() {
+            player1.scale.setTo(shrinkValue, shrinkValue);
+            shrinkValue -= .1;
+            shrinkValue = Math.max(shrinkValue, 0);
+            if (shrinkValue == 0) {
+                player1.x = 1000;
+            }
+        });
+    }
+}
+
+function killPlayer2() {
+    if (player2.health >= 1000 && !player2.dead) {
+        player2.dead = true;
+        p2Score += 1;
+        var shrinkValue = 1;
+        game.time.events.repeat(100, 11, function() {
+            player2.scale.setTo(shrinkValue, shrinkValue);
+            shrinkValue -= .1;
+            shrinkValue = Math.max(shrinkValue, 0);
+            if (shrinkValue == 0) {
+                player2.x = 1000;
+            }
+        });
+    }
+}
+
+function spawnItemBox() {
+
+    itemBoxes.create(Math.floor(Math.random() * (game.world.width - 50)), Math.floor(Math.random() * (game.world.height - 50)), 'itemBox');
+
+}
+
+function giveItem(player) {
+    if (!player.hasItem && !player.dead) {
+        var x;
+        var y;
+        player.item = items[Math.floor(Math.random() * items.length)];
+        player.hasItem = true;
+        if (player.item == 'missile') {
+            x = 20;
+            y = 40;
+        }
+        else
+        if (player.item == 'health') {
+            x = 20;
+            y = 20;
+        }
+        else
+        if (player.item == 'shield') {
+            x = 25;
+            y = 25;
+        }
+        if (player.item == 'rapid') {
+            x = 20;
+            y = 20;
+        }
+        if (player == player1) {
+            power1 = game.add.sprite(x, y, player.item);
+        }
+        else {
+            power2 = game.add.sprite(game.world.width - 100 + x, game.world.height - 100 + y, player.item);
+        }
+
+        //player.itemID = randItem;
+    }
+}
+
+function activateItem(player, target, direction, powerup) {
+    var num;
+    if (player.item == 'missile') {
+        var missile = missiles.create(player.x + 20 + (direction[0] / 3), player.y + 40 + (direction[1] / 3), 'missile');
+        missile.target = target;
+        game.time.events.repeat(100, 50, aimForTarget, this, missile);
+    }
+    if (player.item == 'health') {
+        player.health += 5;
+        player.health = Math.min(20, player.health);
+    }
+    if (player.item == 'shield') {
+        var currentHealth = player.health;
+        powerup.scale.setTo(2, 2);
+        num = 0;
+        game.time.events.repeat(100, 50, function() {
+            player.health = currentHealth;
+            powerup.x = player.x;
+            powerup.y = player.y;
+            num++;
+            if (num == 50) {
+                powerup.destroy();
+            }
+        }, this);
+    }
+    if (player.item == 'rapid') {
+        num = 0;
+        player.fireRate = 250;
+        game.time.events.repeat(100, 50, function() {
+            num++;
+            if (num == 50) {
+                player.fireRate = 500;
+            }
+        }, this);
+    }
+    if(player == player1) {
+        game.add.sprite(0, 0, 'itemSpace');
+    }
+    else {
+        game.add.sprite(game.world.width - 100, game.world.height - 100, 'itemSpace');
+    }
+}
+
+function aimForTarget(obj) {
+    obj.body.velocity.x = obj.target.x - obj.x;
+    obj.body.velocity.y = obj.target.y - obj.y;
+}
+function toScare(){
+    if (Math.floor(Math.random() * 20) == 0) {
+        game.time.events.add(timer.ms + 10000, scare, this);
+    }
+}
+
+</script>
+
+</body>
+</html>
